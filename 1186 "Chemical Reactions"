@@ -1,0 +1,169 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
+namespace _CourseWork
+
+{
+    class Timus
+    {
+        class Parser
+        {
+            Dictionary<string, int> Elements;
+
+            // Конструктор объекта
+            public Parser(string str = "")  
+            {
+                Elements = new Dictionary<string, int>(); 
+                if (!string.IsNullOrEmpty(str))
+                    Elements[str] = 1;
+            }
+
+  // Функция, домножающая значение(кол-во) при ключе с именем р (имя элемента) на число t
+  // Function to multiply key p (element) to t (number)
+            public static Parser operator *(Parser s, int t) 
+            {
+
+                foreach (string p in s.Elements.Keys.ToArray())
+                {
+                    s.Elements[p] = s.Elements[p] * t;
+                }
+                return s;
+            }
+
+            // Функция, складывающая два словаря по ключам
+            // Function to sum two dictionaries
+            public static Parser operator +(Parser s, Parser rhs) 
+            {
+                foreach (KeyValuePair<string, int> p in rhs.Elements)
+                {
+                    if (!s.Elements.ContainsKey(p.Key))  
+                    {
+                        s.Elements[p.Key] = 0;
+                    }
+                    s.Elements[p.Key] += p.Value;
+                }
+                return s;
+            }
+
+            // Локальный оператор равенства для элементов класса Parser
+            //local operator of comparison (like "==") for elements of Parser class
+            public static bool operator ==(Parser s, Parser rhs) 
+            {
+                bool b = IsTheSameDict(rhs.Elements, s.Elements);
+                return b;
+            }
+
+            
+// Локальный оператор не равенства для элементов класса Parser
+// local operator of comparison (like "!=") for elements of Parser class
+            public static bool operator !=(Parser s, Parser rhs)
+            {
+                bool b = !IsTheSameDict(rhs.Elements, s.Elements);
+                return b;
+            }
+        }
+        // Функция для считывания и обработки числа
+        // Fucnction to read and manipulate on a number
+        static Tuple<int, int> ParseNumber(string str, int pos) 
+        { 
+            int num = 0;
+            while (pos < str.Length && char.IsDigit(str[pos]))
+                num = num * 10 + int.Parse(str[pos++].ToString());  
+            return new Tuple<int, int>(num, pos);
+        }
+
+        // Функция для считывания, разбиения и обработки хим.элемента
+        // Function to read, split to elementaries and manipulate on a chemical element
+        static Tuple<Parser, int> ParseElement(string str, int pos)
+        {
+            string ret = "";  // В этой строке будет имя обрабатываемого хим.элемента
+            if (pos < str.Length && str[pos] == '(')  // Скобка может содержать в себе выражение => ведется разбиение на выражение справа
+            {
+                var p = ParseSequence(str, pos + 1);
+                return new Tuple<Parser, int>(p.Item1, p.Item2 + 1);
+            }
+            if (pos < str.Length && !char.IsLetter(str[pos]))
+                return new Tuple<Parser, int>(new Parser(), pos); // Если считываемый знак не явл. буквой, то его обработали в ф-ии ParseSEquence и стираем его
+
+            if (pos < str.Length)   
+
+                ret += str[pos++];
+            while (pos < str.Length && char.IsLetter(str[pos]) && char.IsLower(str[pos]))  
+
+                ret += str[pos++];
+            
+            return new Tuple<Parser, int>(new Parser(ret), pos);
+        }
+
+   // Функция для считывания, разбиения и обработки выражения (более одного элемента)
+        static Tuple<Parser, int> ParseSequence(string str, int pos)
+        {
+            var p = ParseElement(str, pos);
+            if (p.Item2 == pos)  // Если после выполнения предыдущей строки положение не изменилось, значит на первой позиции не хим.элемент
+                return new Tuple<Parser, int>(new Parser(), pos); // значит на позиции была скобка -> "стираем"
+            var q = ParseNumber(str, p.Item2);
+            int r = q.Item1 == 0 ? 1 : q.Item1; // Если предыдущая строка возвращает значение => перед соединением стоит число-множитель, по умолчанию(если нет числа) = 1
+            var rest = ParseSequence(str, q.Item2); // Парсинг остатка строки (после возможного множителя)
+            return new Tuple<Parser, int>(p.Item1 * r + rest.Item1, rest.Item2);
+        }
+
+        // Функция для считывания, разбиения и обработки формулы (более одного выражения)
+        static Tuple<Parser, int> ParseFormula(string str, int pos)
+        {
+            var p = ParseNumber(str, pos);
+
+            int multiplier;
+            if (p.Item2 == pos) // Если после выполнения предыдущей строки положение не изменилось, значит на первой позиции не число
+                multiplier = 1;
+            else
+                multiplier = p.Item1; // Иначе запоминаем число как общий множитель для кол-ва всех элементов соединения (справа и до ‘+’)
+             
+            var q = ParseSequence(str, p.Item2); 
+            if (q.Item2 < str.Length && str[q.Item2] == '+')
+            {
+                var t = ParseFormula(str, q.Item2 + 1);
+                return new Tuple<Parser, int>(q.Item1 * multiplier + t.Item1, t.Item2);
+            }
+            return new Tuple<Parser, int>(q.Item1 * multiplier, q.Item2); 
+
+        }
+
+        // Функция сравнения двух словарей
+        static public bool IsTheSameDict(Dictionary<string, int> dict1, Dictionary<string, int> dict2)
+        {
+            if (dict1.Keys.Count != dict2.Keys.Count)
+                return false;
+
+            foreach (string key in dict1.Keys)
+            {
+                if ((!dict2.ContainsKey(key)) || (dict1[key] != dict2[key]))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        public static void Main(string[] args)
+        {
+            string lhs, rhs;
+            lhs = Console.ReadLine();
+
+            var left = ParseFormula(lhs, 0).Item1;
+
+            int N = int.Parse(Console.ReadLine());
+            for (int i = 0; i < N; i++)
+            {
+                rhs = Console.ReadLine();
+
+                var right = ParseFormula(rhs, 0).Item1;
+
+                Console.Write(lhs);
+                Console.Write(left == right ? "==" : "!=" );
+                Console.WriteLine(rhs);
+
+            }
+        }
+    }
+}
